@@ -4,27 +4,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
-interface TTTState {
+interface TTTState: Array2D<TTTCellValue> {
     val xHasTurn: Boolean
-    fun get(cell: TTTCell): TTTCellValue
-    fun canPlaceAt(cell: TTTCell): Boolean {
-        return get(cell) == TTTCellValue.EMPTY
+}
+
+fun TTTState.get(cell: TTTCell): TTTCellValue = get(cell.row, cell.column)
+
+fun TTTState.canPlaceAt(cell: TTTCell): Boolean {
+    return get(cell) == TTTCellValue.EMPTY
+}
+
+fun TTTState.isOver() = getWinningLine() != null || boardIsFull()
+
+fun TTTState.boardIsFull() = (0..2).all { row -> (0..2).all { col -> get(TTTCell(row, col)) != TTTCellValue.EMPTY } }
+
+/**
+ * If a player has won - return how, otherwise  - return null
+ */
+fun TTTState.getWinningLine(): GameResult? {
+    for (line in possibleWinningLines) {
+        if (line.all { get(it) == TTTCellValue.X }) return GameResult(line, winnerIsX = true)
+        if (line.all { get(it) == TTTCellValue.O }) return GameResult(line, winnerIsX = false)
     }
-
-    fun isOver() = getWinningLine() != null || boardIsFull()
-
-    fun boardIsFull() = (0..2).all { row -> (0..2).all { col -> get(TTTCell(row, col)) != TTTCellValue.EMPTY } }
-
-    /**
-     * If a player has won - return how, otherwise  - return null
-     */
-    fun getWinningLine(): GameResult? {
-        for (line in possibleWinningLines) {
-            if (line.all { get(it) == TTTCellValue.X }) return GameResult(line, winnerIsX = true)
-            if (line.all { get(it) == TTTCellValue.O }) return GameResult(line, winnerIsX = false)
-        }
-        return null
-    }
+    return null
 }
 
 
@@ -32,7 +34,10 @@ class MutableTTTState: TTTState {
     val board = StateArray2D(3, 3, TTTCellValue.EMPTY)
     override var xHasTurn by mutableStateOf(true)
 
-    override fun get(cell: TTTCell) = board[cell.row, cell.column]
+    override val columns: Int = 3
+    override val rows: Int = 3
+    override fun get(row: Int, column: Int): TTTCellValue  = board[row, column]
+
     private fun set(cell: TTTCell, value: TTTCellValue) {
         board[cell.row, cell.column] = value
     }
@@ -43,18 +48,8 @@ class MutableTTTState: TTTState {
     }
 
     override fun toString(): String {
-        return buildString {
-            repeat(3) { row ->
-                repeat(3) { col ->
-                    append(get(TTTCell(row, col)))
-                    append(" ")
-                }
-                appendLine()
-            }
-        }
+        return "Turn: ${if (xHasTurn) "X" else "O"}: \n" + board
     }
-
-
 
     fun reset() {
         board.clear()
@@ -103,26 +98,12 @@ data class GameResult(
 data class WinningLine(val a: TTTCell, val b: TTTCell, val c: TTTCell) : List<TTTCell> by listOf(a, b, c)
 
 enum class TTTCellValue {
-    EMPTY, X, O
-}
+    EMPTY, X, O;
 
-
-class StateArray2D<T>(
-    val rows: Int,
-    val columns: Int,
-    val initialValue: T,
-) {
-    private val items = MutableStateList(rows * columns) { initialValue }
-    fun clear() {
-        items.clear()
-        items.addAll(List(rows * columns) { initialValue })
-    }
-
-    operator fun get(row: Int, column: Int): T {
-        return items[row * columns + column]
-    }
-
-    operator fun set(row: Int, column: Int, value: T) {
-        items[row * columns + column] = value
+    override fun toString(): String  = when(this) {
+        TTTCellValue.EMPTY ->  " "
+        TTTCellValue.X -> "X"
+        TTTCellValue.O -> "O"
     }
 }
+

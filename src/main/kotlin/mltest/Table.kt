@@ -1,3 +1,5 @@
+@file:Suppress("DuplicatedCode")
+
 package mltest
 
 import androidx.compose.runtime.Composable
