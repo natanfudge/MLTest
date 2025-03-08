@@ -17,14 +17,15 @@ import androidx.compose.ui.unit.sp
 
 
 @Composable
-fun TTTView(state: MutableTTTState) {
+fun TTTView(state: TTTState) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Table(rows = 3, columns = 3) { row, column ->
             val cell = TTTCell(row, column)
             val win = state.getWinningLine()
             Box(
                 Modifier.border(1.dp, Color.Black).size(50.dp)
-                    .addIf(win == null && state.canPlaceAt(cell)) {
+                    .addIf(win == null && state.canPlaceAt(cell) && state is MutableTTTState) {
+                        state as MutableTTTState
                         clickable {
                             state.makePlacement(cell)
                             if (!state.isOver()) {
@@ -37,7 +38,7 @@ fun TTTView(state: MutableTTTState) {
                         background(Color.Red.copy(alpha = 0.3f))
                     }
             ) {
-                when (state.board[row, column]) {
+                when (state[row, column]) {
                     TTTCellValue.EMPTY -> {
 
                     }
@@ -48,9 +49,12 @@ fun TTTView(state: MutableTTTState) {
             }
         }
 
-        Button(onClick = { state.reset() }) {
-            Text("Reset")
+        if (state is MutableTTTState) {
+            Button(onClick = { state.reset() }) {
+                Text("Reset")
+            }
         }
+
     }
 
 }

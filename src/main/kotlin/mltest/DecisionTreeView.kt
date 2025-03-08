@@ -1,30 +1,15 @@
 package mltest
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
-import androidx.compose.ui.layout.Measurable
-import androidx.compose.ui.layout.MeasureResult
-import androidx.compose.ui.layout.MeasureScope
-import androidx.compose.ui.node.LayoutModifierNode
-import androidx.compose.ui.node.ModifierNodeElement
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import mltest.DecisionTree.Decision
 
 
@@ -34,43 +19,32 @@ fun DecisionTreeViewTest() {
         DecisionTreeTTTAI.createDecisionTree(
             TTTDecisionContext(
                 iAmX = true,
-                board = MutableTTTState()
+                board = ProjectedTTTState()
             )
         )
-    )
+    ) {
+        TTTView(it.board)
+    }
 }
 
-fun Modifier.freeformMovement(transform: TransformationMatrix2D) = this then FreeformMovementElement(transform)
+class PositionMap
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun <D, S> DecisionTreeView(tree: DecisionTree<D, S>) {
-    val layers = tree.collectLayers()
-    val first2 = layers.take(2)
-
-    var transform by remember { mutableStateOf(TransformationMatrix2D()) }
-
-    println("Zom = $transform")
-
-    Box(
-        Modifier.fillMaxSize().border(1.dp, Color.Red)
-            .onPointerEvent(PointerEventType.Scroll) { pointerEvent ->
-                pointerEvent.changes.forEach { change ->
-                    transform = transform.scale(1 + change.scrollDelta.y * -0.3f, focalPoint = change.position)
-                }
-            }) {
-        Column(Modifier.freeformMovement(transform), horizontalAlignment = Alignment.CenterHorizontally) {
+fun <D, S> DecisionTreeView(tree: DecisionTree<D, S>, displayNode: @Composable (S) -> Unit) {
+    val layers = remember { tree.collectLayers() }
+    val first2 = remember { layers.take(2) }
+    Box(Modifier.freeformMovement()) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
             for (layer in first2) {
-                Row {
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     for (possibility in layer) {
-                        Text(possibility.toString())
+                        displayNode(possibility)
                     }
                 }
             }
         }
     }
-
-
 }
 
 
@@ -83,44 +57,6 @@ private fun <S> DecisionTree<*, S>.collectLayers(): List<List<S>> {
     }
 
     return result
-}
-
-private data class FreeformMovementElement(val transformation: TransformationMatrix2D) :
-    ModifierNodeElement<FreeformMovementNode>() {
-    override fun create() = FreeformMovementNode(transformation)
-
-    override fun update(node: FreeformMovementNode) {
-        node.transformation = transformation
-    }
-}
-
-
-private class FreeformMovementNode(
-    var transformation: TransformationMatrix2D,
-) : LayoutModifierNode, Modifier.Node() {
-
-    override fun MeasureScope.measure(
-        measurable: Measurable,
-        constraints: Constraints,
-    ): MeasureResult {
-        val placeable = measurable.measure(
-            Constraints(
-                minWidth = 0,
-                minHeight = 0,
-                maxWidth = Constraints.Infinity,
-                maxHeight = Constraints.Infinity
-            )
-        )
-        return layout(constraints.maxWidth, constraints.maxHeight) {
-            placeable.placeWithLayer(x = 0, y = 0) {
-                this.transformOrigin = TransformOrigin(0f, 0f)
-                scaleX = transformation.scale
-                scaleY = transformation.scale
-                translationX = transformation.translateX
-                translationY = transformation.translateY
-            }
-        }
-    }
 }
 
 

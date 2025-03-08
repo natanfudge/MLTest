@@ -52,13 +52,15 @@ object DecisionTreeTTTAI : TTTAI {
         return copy(board = ProjectedTTTState(newCells, xHasTurn = !board.xHasTurn))
     }
 
-    private class ProjectedTTTState(
-        private val board: Array2D<TTTCellValue>,
-        override val xHasTurn: Boolean,
-    ) : TTTState, Array2D<TTTCellValue> by board {
-        override fun toString(): String {
-            return "Turn: ${if (xHasTurn) "X" else "O"}: \n" + board
-        }
+
+}
+
+class ProjectedTTTState(
+    private val board: Array2D<TTTCellValue> = Array2D(3, 3) { _, _ -> TTTCellValue.EMPTY },
+    override val xHasTurn: Boolean = true,
+) : TTTState, Array2D<TTTCellValue> by board {
+    override fun toString(): String {
+        return "Turn: ${if (xHasTurn) "X" else "O"}: \n" + board
     }
 }
 
