@@ -1,5 +1,6 @@
 package mltest
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -14,36 +15,60 @@ import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.unit.Constraints
 
+class FreeformMovementState(transform: TransformationMatrix2D) {
+    var transform by mutableStateOf(transform)
+    fun scale(factor: Float, focalPoint: Offset) {
+        transform = transform.scale(factor, focalPoint)
+    }
+
+    fun translate(offset: Offset) {
+        transform = transform.translate(offset)
+    }
+}
+
+@Composable
+fun rememberFreeformMovementState() = remember { FreeformMovementState(TransformationMatrix2D()) }
+
+val LocalFreeformMovementState = staticCompositionLocalOf<FreeformMovementState> { error("") }
+
 /**
  * Allows panning and zooming in this component.
  */
 @Composable
-fun Modifier.freeformMovement(): Modifier {
-    var transform by remember { mutableStateOf(TransformationMatrix2D()) }
+fun FreeformMovement(content: @Composable () -> Unit) {
+    val transform = rememberFreeformMovementState()
     // We don't need UI to recompose on prevMousePos change to we use a Holder instead of a State
     var prevMousePos by remember<Holder<Offset?>> { Holder(null) }
 
-    return fillMaxSize()
-        .onPointerChangeEvent(PointerEventType.Press) {
-            // Start panning
-            prevMousePos = it.position
+    CompositionLocalProvider(LocalFreeformMovementState provides transform) {
+        //TODO: replace Box with Layout
+        Box(
+            Modifier.fillMaxSize()
+                .onPointerChangeEvent(PointerEventType.Press) {
+                    // Start panning
+                    prevMousePos = it.position
+                }
+                .onPointerChangeEvent(PointerEventType.Release) {
+                    // Stop panning
+                    prevMousePos = null
+                }
+                .onPointerChangeEvent(PointerEventType.Move) { change ->
+                    val prevMousePosValue = prevMousePos
+                    if (prevMousePosValue != null) {
+                        val delta = change.position - prevMousePosValue
+                        transform.translate(delta)
+                        prevMousePos = change.position
+                    }
+                }
+                .onPointerChangeEvent(PointerEventType.Scroll) { change ->
+                    // Scale relative to scroll delta y
+                    transform.scale(1 + change.scrollDelta.y * -ZoomSpeed, focalPoint = change.position)
+                }.movementTransform { transform.transform }
+        ) {
+            content()
         }
-        .onPointerChangeEvent(PointerEventType.Release) {
-            // Stop panning
-            prevMousePos = null
-        }
-        .onPointerChangeEvent(PointerEventType.Move) { change ->
-            val prevMousePosValue = prevMousePos
-            if (prevMousePosValue != null) {
-                val delta = change.position - prevMousePosValue
-                transform = transform.translate(delta)
-                prevMousePos = change.position
-            }
-        }
-        .onPointerChangeEvent(PointerEventType.Scroll) { change ->
-            // Scale relative to scroll delta y
-            transform = transform.scale(1 + change.scrollDelta.y * -ZoomSpeed, focalPoint = change.position)
-        }.movementTransform { transform }
+    }
+
 }
 
 private const val ZoomSpeed = 0.3f

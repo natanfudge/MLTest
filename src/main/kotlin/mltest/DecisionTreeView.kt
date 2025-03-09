@@ -1,32 +1,20 @@
 package mltest
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import mltest.DecisionTree.Decision
-import java.util.IdentityHashMap
 
 
 @Composable
@@ -43,6 +31,30 @@ fun DecisionTreeViewTest() {
     }
 }
 
+class PositionHolder<T> {
+    private val positionMap = mutableStateMapOf<T, Rect>()
+
+    fun updatePosition(key: T, pos: Rect) {
+        positionMap[key] = pos
+    }
+
+    fun positionOf(key: T): Rect? {
+        return positionMap[key]
+    }
+}
+
+@Composable
+fun <T> Modifier.trackPosition(positionHolder: PositionHolder<T>, byKey: T): Modifier {
+    val movementState = LocalFreeformMovementState.current
+    return onGloballyPositioned {
+        positionHolder.updatePosition(
+            byKey, Rect(
+                it.positionInRoot(), it.size.toSize() * movementState.transform.scale
+            )
+        )
+    }
+}
+
 //class PositionMap
 
 
@@ -50,21 +62,21 @@ fun DecisionTreeViewTest() {
 @Composable
 fun <D, S> DecisionTreeView(tree: DecisionTree<D, S>, displayNode: @Composable (S) -> Unit) {
     val layers = remember { tree.collectLayers() }
-    val first2 = remember { layers.take(2) }
-    val positionMap = remember { mutableStateMapOf<S, Rect>() }
-    Box {
-        Box(Modifier.freeformMovement()) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(50.dp)) {
-                for (layer in first2) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        for (possibility in layer) {
-                            Box(Modifier.onGloballyPositioned {
+    val first2 = remember { layers.take(3) }
 
-                                positionMap[possibility] = Rect(it.positionInRoot(), it.size.toSize())
-                                println("Positioned")
-                            }) {
+    val nodePositions = remember { PositionHolder<S>() }
+    Box {
+        FreeformMovement {
+            ResizeWidthColumn(
+                verticalArrangement = Arrangement.spacedBy(500.dp)
+            ) {
+                for (layer in first2) {
+                    Row(horizontalArrangement = Arrangement.SpaceEvenly) {
+                        for (possibility in layer) {
+                            Box(Modifier.trackPosition(nodePositions, possibility).padding(horizontal = 10.dp)) {
                                 displayNode(possibility)
                             }
+
                         }
                     }
                 }
@@ -72,15 +84,26 @@ fun <D, S> DecisionTreeView(tree: DecisionTree<D, S>, displayNode: @Composable (
 
 
         }
+
         Canvas(Modifier.fillMaxSize()) {
-            val p1 = positionMap[first2[0][0]]
-            val p2 = positionMap[first2[1][0]]
+            tree.visitChildren(depth = 2) { parent, causingChoice, state ->
+                val parentPos = nodePositions.positionOf(parent)
+                val childPos = nodePositions.positionOf(state)
 
-            println("p1 = $p1, p2 = $p2")
 
-            if(p1 != null && p2 != null) {
-                drawLine(Color.Red, p1.bottomCenter, p2.topCenter)
+                if (parentPos != null && childPos != null) {
+                    drawLine(Color.Red, parentPos.bottomCenter, childPos.topCenter)
+                }
             }
+
+//            val p1 = nodePositions.positionOf(first2[0][0])
+//            val p2 = nodePositions.positionOf(first2[1][0])
+//
+//            println("p1 = $p1, p2 = $p2")
+//
+//            if (p1 != null && p2 != null) {
+//                drawLine(Color.Red, p1.bottomCenter, p2.topCenter)
+//            }
 
         }
 
@@ -117,6 +140,14 @@ class DecisionTree<D, S>(
                 state = root, choices = options(root)
                     .map { (decision, result) -> Decision(decision, create(result, options)) }
             )
+        }
+    }
+
+    fun visitChildren(depth: Int, visitor: (parent: S, causingChoice: D, child: S) -> Unit) {
+        if (depth == 0) return
+        for (choice in choices) {
+            visitor(this.state, choice.decision, choice.node.state)
+            choice.node.visitChildren(depth - 1, visitor)
         }
     }
 
