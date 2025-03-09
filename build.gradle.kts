@@ -6,7 +6,7 @@ plugins {
     kotlin("jvm")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.compose.hot-reload") version "1.0.0-alpha01" // <- add this additionally
+    id("org.jetbrains.compose.hot-reload") version "1.0.0-DEBUG"
 }
 
 group = "natan"
@@ -16,6 +16,8 @@ repositories {
     mavenCentral()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
     google()
+
+    maven("C:\\Users\\natan\\Desktop\\compose-hot-reload\\build\\repo")
 }
 
 composeCompiler {

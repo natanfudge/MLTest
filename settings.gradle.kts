@@ -5,6 +5,9 @@ pluginManagement {
         google()
         gradlePluginPortal()
         mavenCentral()
+
+        maven("C:\\Users\\natan\\Desktop\\compose-hot-reload\\build\\repo")
+
     }
 
     plugins {
@@ -17,5 +20,6 @@ pluginManagement {
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "0.9.0"
 }
+
 
 rootProject.name = "MLTest"
