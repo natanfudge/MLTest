@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -14,21 +13,22 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
-import mltest.DecisionTree.Decision
 
 
 @Composable
 fun DecisionTreeViewTest() {
-    DecisionTreeView(
+    val tree = remember {
         DecisionTreeTTTAI.createDecisionTree(
             TTTDecisionContext(
                 iAmX = true,
                 board = ProjectedTTTState()
             )
         )
-    ) {
+    }
+    DecisionTreeView(tree) {
         TTTView(it.board)
     }
+
 }
 
 class PositionHolder<T> {
@@ -47,6 +47,7 @@ class PositionHolder<T> {
 fun <T> Modifier.trackPosition(positionHolder: PositionHolder<T>, byKey: T): Modifier {
     val movementState = LocalFreeformMovementState.current
     return onGloballyPositioned {
+        println("Update to ${it.positionInRoot()}")
         positionHolder.updatePosition(
             byKey, Rect(
                 it.positionInRoot(), it.size.toSize() * movementState.transform.scale
@@ -60,13 +61,14 @@ fun <T> Modifier.trackPosition(positionHolder: PositionHolder<T>, byKey: T): Mod
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun <D, S> DecisionTreeView(tree: DecisionTree<D, S>, displayNode: @Composable (S) -> Unit) {
+fun <T, L> DecisionTreeView(tree: LabeledEdgeTree<T, L>, displayNode: @Composable (T) -> Unit) {
     val layers = remember { tree.collectLayers() }
     val first2 = remember { layers.take(3) }
 
-    val nodePositions = remember { PositionHolder<S>() }
+    val nodePositions = remember { PositionHolder<T>() }
+    val freeform = rememberFreeformMovementState(TransformationMatrix2D().scale(0.06f).translate(0f, 100f))
     Box {
-        FreeformMovement {
+        FreeformMovement(freeform) {
             ResizeWidthColumn(
                 verticalArrangement = Arrangement.spacedBy(500.dp)
             ) {
@@ -76,13 +78,11 @@ fun <D, S> DecisionTreeView(tree: DecisionTree<D, S>, displayNode: @Composable (
                             Box(Modifier.trackPosition(nodePositions, possibility).padding(horizontal = 10.dp)) {
                                 displayNode(possibility)
                             }
-
                         }
                     }
                 }
+
             }
-
-
         }
 
         Canvas(Modifier.fillMaxSize()) {
@@ -95,16 +95,6 @@ fun <D, S> DecisionTreeView(tree: DecisionTree<D, S>, displayNode: @Composable (
                     drawLine(Color.Red, parentPos.bottomCenter, childPos.topCenter)
                 }
             }
-
-//            val p1 = nodePositions.positionOf(first2[0][0])
-//            val p2 = nodePositions.positionOf(first2[1][0])
-//
-//            println("p1 = $p1, p2 = $p2")
-//
-//            if (p1 != null && p2 != null) {
-//                drawLine(Color.Red, p1.bottomCenter, p2.topCenter)
-//            }
-
         }
 
     }
@@ -112,59 +102,64 @@ fun <D, S> DecisionTreeView(tree: DecisionTree<D, S>, displayNode: @Composable (
 }
 
 
-private fun <S> DecisionTree<*, S>.collectLayers(): List<List<S>> {
+fun <S> LabeledEdgeTree<S, *>.collectLayers(): List<List<S>> {
     var row = listOf(this)
     val result = mutableListOf<List<S>>()
     while (row.isNotEmpty()) {
-        result.add(row.map { it.state })
-        row = row.flatMap { layerNode -> layerNode.choices.map { it.node } }
+        result.add(row.map { it.value })
+        row = row.flatMap { layerNode -> layerNode.children.map { it.node } }
     }
 
     return result
 }
 
 
-class DecisionTree<D, S>(
-    val state: S,
-    val choices: List<Decision<D, S>>,
+data class LabeledEdge<T, L>(
+    val label: L,
+    val value: T,
+)
+
+class LabeledEdgeTree<T, L>(
+    val value: T,
+    val children: List<LabeledChild<T, L>>,
 ) {
 
-    data class Decision<D, S>(val decision: D, val node: DecisionTree<D, S>)
+    data class LabeledChild<T, L>(val label: L, val node: LabeledEdgeTree<T, L>)
 
     companion object {
-        fun <Decision, Result> create(
-            root: Result,
-            options: (Result) -> List<DeterministicDecision<Decision, Result>>,
-        ): DecisionTree<Decision, Result> {
-            return DecisionTree(
-                state = root, choices = options(root)
-                    .map { (decision, result) -> Decision(decision, create(result, options)) }
+        fun <T, L> create(
+            root: T,
+            options: (T) -> List<LabeledEdge<T, L>>,
+        ): LabeledEdgeTree<T, L> {
+            return LabeledEdgeTree<T, L>(
+                value = root, children = options(root)
+                    .map { (decision, result) -> LabeledChild(decision, create(result, options)) }
             )
         }
     }
 
-    fun visitChildren(depth: Int, visitor: (parent: S, causingChoice: D, child: S) -> Unit) {
+    fun visitChildren(depth: Int, visitor: (parent: T, causingChoice: L, child: T) -> Unit) {
         if (depth == 0) return
-        for (choice in choices) {
-            visitor(this.state, choice.decision, choice.node.state)
+        for (choice in children) {
+            visitor(this.value, choice.label, choice.node.value)
             choice.node.visitChildren(depth - 1, visitor)
         }
     }
 
 
-    fun choose(fitnessFunc: (S) -> Double): D {
-        val choice = choices.maxBy {
+    fun choose(fitnessFunc: (T) -> Double): L {
+        val choice = children.maxBy {
             it.node.myChoiceScore(fitnessFunc)
         }
 
-        return choice.decision
+        return choice.label
     }
 
-    private fun myChoiceScore(fitnessFunc: (S) -> Double): Double {
-        if (choices.isEmpty()) return fitnessFunc(state)
+    private fun myChoiceScore(fitnessFunc: (T) -> Double): Double {
+        if (children.isEmpty()) return fitnessFunc(value)
         else {
             // We assume the opponent will pick the best choice
-            val worstOpponentChoiceForMe = choices.minOf {
+            val worstOpponentChoiceForMe = children.minOf {
                 it.node.opponentChoiceScore(fitnessFunc)
             }
             return worstOpponentChoiceForMe
@@ -177,10 +172,10 @@ class DecisionTree<D, S>(
     // 3. Even a decision tree is not the optimal solution, because this naive implementation only assumes the opponent
     // plays optimally, and won't try to trip up the player and win against bad players.
 
-    private fun opponentChoiceScore(fitnessFunc: (S) -> Double): Double {
-        if (choices.isEmpty()) return fitnessFunc(state)
+    private fun opponentChoiceScore(fitnessFunc: (T) -> Double): Double {
+        if (children.isEmpty()) return fitnessFunc(value)
         // We assume the opponent will assume we will pick the best choice
-        val bestMyChoiceForMe = choices.maxOf {
+        val bestMyChoiceForMe = children.maxOf {
             it.node.myChoiceScore(fitnessFunc)
         }
         return bestMyChoiceForMe

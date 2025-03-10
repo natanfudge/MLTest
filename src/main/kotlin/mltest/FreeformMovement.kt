@@ -27,7 +27,9 @@ class FreeformMovementState(transform: TransformationMatrix2D) {
 }
 
 @Composable
-fun rememberFreeformMovementState() = remember { FreeformMovementState(TransformationMatrix2D()) }
+fun rememberFreeformMovementState(initial: TransformationMatrix2D = TransformationMatrix2D()) = remember {
+    FreeformMovementState(initial)
+}
 
 val LocalFreeformMovementState = staticCompositionLocalOf<FreeformMovementState> { error("") }
 
@@ -35,8 +37,7 @@ val LocalFreeformMovementState = staticCompositionLocalOf<FreeformMovementState>
  * Allows panning and zooming in this component.
  */
 @Composable
-fun FreeformMovement(content: @Composable () -> Unit) {
-    val transform = rememberFreeformMovementState()
+fun FreeformMovement(transform: FreeformMovementState = rememberFreeformMovementState(), content: @Composable () -> Unit) {
     // We don't need UI to recompose on prevMousePos change to we use a Holder instead of a State
     var prevMousePos by remember<Holder<Offset?>> { Holder(null) }
 

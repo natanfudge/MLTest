@@ -15,6 +15,7 @@ enum class SlotsEnum {
 }
 
 //TODO: refactor this. TBH I think you can implement it with Layout not SubcomposeLayout
+//TODO: I think i can use subcomposelayout for the line drawing.
 @Composable
 fun ResizeWidthColumn(modifier: Modifier = Modifier, resize: Boolean = true, verticalArrangement: Arrangement.Vertical = Arrangement.Top, mainContent: @Composable () -> Unit) {
     SubcomposeLayout(modifier) { constraints ->

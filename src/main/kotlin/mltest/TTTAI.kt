@@ -11,7 +11,7 @@ interface TTTAI : AI<TTTDecisionContext, TTTPlacementDecision>
 object DecisionTreeTTTAI : TTTAI {
 
     fun createDecisionTree(input: TTTDecisionContext): TTTDecisionTree {
-        return DecisionTree.create(input) {
+        return LabeledEdgeTree.create(input) {
             possibleDecisions(it)
         }
     }
@@ -65,8 +65,8 @@ class ProjectedTTTState(
 }
 
 
-typealias TTTDecisionTree = DecisionTree<TTTPlacementDecision, TTTDecisionContext>
-typealias TTTDecisionResult = DeterministicDecision<TTTPlacementDecision, TTTDecisionContext>
+typealias TTTDecisionTree = LabeledEdgeTree<TTTDecisionContext, TTTPlacementDecision>
+typealias TTTDecisionResult = LabeledEdge<TTTDecisionContext, TTTPlacementDecision>
 
 // TODO: First do some visualizations for easy debugging, and only then we'll do this stuff:
 //TODO: next thing to clean up: decision tree. I'm thinking of adding distinction between my player and
@@ -74,10 +74,7 @@ typealias TTTDecisionResult = DeterministicDecision<TTTPlacementDecision, TTTDec
 // do bad plays.
 
 
-data class DeterministicDecision<Decision, State>(
-    val decision: Decision,
-    val result: State,
-)
+
 
 data class TTTDecisionContext(
     val iAmX: Boolean,
